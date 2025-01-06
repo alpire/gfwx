@@ -48,6 +48,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <limits>
+#include <span>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -723,8 +724,8 @@ namespace GFWX
 			while (*pc >= 0)
 			{
 				int const c = *(pc ++);
-				aux * destination = &auxData[c * bufferSize];
-				transformTerm(pc, destination, &auxData[0], bufferSize, imageData, header, isChroma, boost);
+				std::span<aux> destination = std::span(auxData).subspan(c * bufferSize);
+				transformTerm(pc, destination.data(), auxData.data(), bufferSize, imageData, header, isChroma, boost);
 				auto layer = imageData + ((c / header.channels) * bufferSize * header.channels + c % header.channels);
 				OMP_PARALLEL_FOR(ThreadIterations * ThreadIterations)
 				for (int i = 0; i < bufferSize; ++ i)
@@ -739,7 +740,7 @@ namespace GFWX
 		stream.flushWriteWord();
 		for (int c = 0; c < header.layers * header.channels; ++ c) if (isChroma[c] == -1)	// copy channels having no transform
 		{
-			aux * destination = &auxData[c * bufferSize];
+			std::span<aux> destination = std::span(auxData).subspan(c * bufferSize);
 			auto layer = imageData + ((c / header.channels) * bufferSize * header.channels + c % header.channels);
 			OMP_PARALLEL_FOR(ThreadIterations * ThreadIterations)
 			for (int i = 0; i < bufferSize; ++ i)
@@ -748,7 +749,8 @@ namespace GFWX
 		}
 		for (int c = 0; c < header.layers * header.channels; ++ c)	// lift and quantize the channels
 		{
-			Image<aux> auxImage(&auxData[c * bufferSize], header.sizex, header.sizey);
+			std::span<aux> destination = std::span(auxData).subspan(c * bufferSize);
+			Image<aux> auxImage(auxData.data(), header.sizex, header.sizey);
 			lift(auxImage, 0, 0, header.sizex, header.sizey, 1, header.filter);
 			if (header.intent >= IntentBayerRGGB && header.intent <= IntentBayerGeneric)
 			{
